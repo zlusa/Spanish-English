@@ -176,12 +176,7 @@ export function useRemoteTranslation({
             return
           }
           if (peerConnection.connectionState === "failed") {
-            const ice = peerConnection.iceConnectionState
-            setError(
-              `Translation WebRTC failed (ICE: ${ice}). ` +
-                `Corporate firewalls and VPNs often block direct WebRTC — try another network, disable VPN, ` +
-                `or configure TURN (see docs/TRAINING_ROOM_OPS.md: VITE_TURN_* / VITE_WEBRTC_ICE_SERVERS).`
-            )
+            setError(buildTranslationConnectionError(peerConnection.iceConnectionState))
             setStatus("error")
           }
           if (peerConnection.connectionState === "connected") {
@@ -412,4 +407,29 @@ function getSubtitle(transcript: string) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Translation failed"
+}
+
+/** User-facing copy when the OpenAI translation peer hits `connectionState === "failed"`. */
+function buildTranslationConnectionError(ice: RTCIceConnectionState): string {
+  const help =
+    "Personal **phone on LTE/5G** (not office Wi‑Fi) or a **home / hotspot** network usually works without extra setup. " +
+    "Staying on **corporate Wi‑Fi or VPN** often needs **TURN** in the web build (`VITE_TURN_*` or `VITE_WEBRTC_ICE_SERVERS`; see docs/TRAINING_ROOM_OPS.md)."
+
+  if (ice === "disconnected") {
+    return (
+      "Translation WebRTC failed (ICE: disconnected). " +
+      "That often appears after ~10s when the browser never keeps a stable path to OpenAI through a strict firewall. " +
+      help
+    )
+  }
+
+  if (ice === "failed") {
+    return (
+      "Translation WebRTC failed (ICE: failed). " +
+      "Direct WebRTC to OpenAI was blocked or could not complete. " +
+      help
+    )
+  }
+
+  return `Translation WebRTC failed (ICE: ${ice}). ${help}`
 }
