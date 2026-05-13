@@ -6,13 +6,13 @@ import {
   RoomServiceClient,
 } from "livekit-server-sdk"
 
-import { joinCodeMatches, joinCodeRequired } from "./join-code"
-import { getLiveKitEnv, normalizeLiveKitSegment } from "./livekit-env"
+import { joinCodeMatches, joinCodeRequired } from "./join-code.js"
+import { getLiveKitEnv, normalizeLiveKitSegment } from "./livekit-env.js"
 import {
   buildTranslationClientSecretRequest,
   normalizeTranslationLanguage,
-} from "./openai-translation"
-import { readJsonBody } from "./read-json-body"
+} from "./openai-translation.js"
+import { readJsonBody } from "./read-json-body.js"
 
 type TokenResponse = {
   serverUrl: string
