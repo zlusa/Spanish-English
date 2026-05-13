@@ -1,0 +1,13 @@
+{
+  "name": "spanish-english-training",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "start": "pnpm dev",
+    "dev:web": "pnpm --filter @training/web dev",
+    "dev:realtime": "pnpm --filter @training/realtime dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint"
+  },
+  "packageManager": "pnpm@10.23.0"
+}
