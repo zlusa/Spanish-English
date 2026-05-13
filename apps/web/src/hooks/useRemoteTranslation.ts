@@ -5,6 +5,7 @@ import {
   buildSessionUpdate,
 } from "@/lib/realtime-translation-config"
 import { buildTranslationRtcConfiguration } from "@/lib/webrtc-ice-config"
+import { waitForIceGatheringComplete } from "@/lib/wait-ice-gathering"
 
 export type TranslationStatus = "idle" | "connecting" | "connected" | "error"
 
@@ -232,6 +233,9 @@ export function useRemoteTranslation({
 
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
+        /** Include host/srflx (and relay) candidates in the SDP before POSTing to OpenAI. */
+        await waitForIceGatheringComplete(peerConnection, 18_000)
+        const offerSdp = peerConnection.localDescription?.sdp ?? offer.sdp
 
         const sdpResponse = await fetch(REALTIME_TRANSLATION_CALL_URL, {
           method: "POST",
@@ -239,7 +243,7 @@ export function useRemoteTranslation({
             Authorization: `Bearer ${token.clientSecret}`,
             "Content-Type": "application/sdp",
           },
-          body: offer.sdp,
+          body: offerSdp,
         })
 
         const answerSdp = await sdpResponse.text()

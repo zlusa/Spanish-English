@@ -20,6 +20,7 @@ The Vite dev server uses **HTTPS with a self-signed certificate** so phones get 
 
 The translation sidecar opens a **second** browser `RTCPeerConnection` to **OpenAI** (`api.openai.com`), separate from LiveKit. If you see **Translation WebRTC failed** or an error mentioning **ICE**:
 
+- The client **waits for ICE gathering** to finish (or up to ~18s) before sending the SDP offer so candidates are not missing — if failures persist, the path still needs **TURN** or a different network.
 - Try **without VPN** and avoid **guest Wi‑Fi** that blocks WebRTC or UDP.
 - **Corporate networks** often block direct UDP/WebRTC; symptoms can show after **~10s** as ICE goes **disconnected** / **failed**. The quickest check is the same app on a **personal phone using cellular data** (not the office Wi‑Fi), or **home Wi‑Fi / a personal hotspot** — those paths usually work without TURN.
 - **TURN relay** (often required on locked-down PCs): set build-time env on the **web** app (Vite inlines `VITE_*` into the static bundle — redeploy after changes; use TURN credentials your org allows to ship to browsers, or short-lived tokens if your provider supports them):
