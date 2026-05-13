@@ -4,6 +4,7 @@ import {
   REALTIME_TRANSLATION_CALL_URL,
   buildSessionUpdate,
 } from "@/lib/realtime-translation-config"
+import { buildTranslationRtcConfiguration } from "@/lib/webrtc-ice-config"
 
 export type TranslationStatus = "idle" | "connecting" | "connected" | "error"
 
@@ -43,11 +44,6 @@ type RealtimeEvent = {
   type?: unknown
   delta?: unknown
   error?: unknown
-}
-
-/** STUN helps ICE when NAT/firewall blocks host candidates to OpenAI. */
-const DEFAULT_RTC: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 }
 
 /** Resolve API base for translation token (same host in dev via Vite proxy). */
@@ -153,7 +149,7 @@ export function useRemoteTranslation({
         }
 
         clonedSendTrack = activeSourceTrack.clone()
-        peerConnection = new RTCPeerConnection(DEFAULT_RTC)
+        peerConnection = new RTCPeerConnection(buildTranslationRtcConfiguration())
         dataChannel = peerConnection.createDataChannel("oai-events")
         translatedAudio = new Audio()
         translatedAudio.autoplay = true
@@ -183,7 +179,8 @@ export function useRemoteTranslation({
             const ice = peerConnection.iceConnectionState
             setError(
               `Translation WebRTC failed (ICE: ${ice}). ` +
-                `If you use a VPN, corporate firewall, or strict Wi‑Fi, try another network or disable VPN.`
+                `Corporate firewalls and VPNs often block direct WebRTC — try another network, disable VPN, ` +
+                `or configure TURN (see docs/TRAINING_ROOM_OPS.md: VITE_TURN_* / VITE_WEBRTC_ICE_SERVERS).`
             )
             setStatus("error")
           }

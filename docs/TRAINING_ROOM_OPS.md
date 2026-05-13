@@ -21,7 +21,12 @@ The Vite dev server uses **HTTPS with a self-signed certificate** so phones get 
 The translation sidecar opens a **second** browser `RTCPeerConnection` to **OpenAI** (`api.openai.com`), separate from LiveKit. If you see **Translation WebRTC failed** or an error mentioning **ICE**:
 
 - Try **without VPN** and avoid **guest Wi‑Fi** that blocks WebRTC or UDP.
-- **Corporate networks** often block browser WebRTC to external hosts; try a home network or phone hotspot to confirm.
+- **Corporate networks** often block direct UDP/WebRTC; try a home network or phone hotspot to confirm.
+- **TURN relay** (often required on locked-down PCs): set build-time env on the **web** app (Vite inlines `VITE_*` into the static bundle — redeploy after changes; use TURN credentials your org allows to ship to browsers, or short-lived tokens if your provider supports them):
+  - **`VITE_TURN_URLS`** — comma-separated list, e.g. `turns:turn.example.com:443?transport=tcp,turn:turn.example.com:3478` (prefer **`turns:` on 443** inside strict firewalls).
+  - **`VITE_TURN_USERNAME`** / **`VITE_TURN_CREDENTIAL`** — long-term TURN user and password when your server requires them.
+  - **`VITE_WEBRTC_ICE_SERVERS`** — optional JSON **array** of full `RTCIceServer` objects if you need multiple entries or unusual fields (same format as the WebRTC spec).
+- The app always adds a public **STUN** server and merges your TURN entries after that.
 - The app uses a **cloned** copy of the remote LiveKit mic for OpenAI so it does not fight LiveKit’s own audio path.
 
 ## Push-to-talk (PTT)

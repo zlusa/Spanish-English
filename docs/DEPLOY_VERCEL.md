@@ -30,6 +30,12 @@ In the project **Settings → Environment Variables**, add:
 | `OPENAI_API_KEY` | Yes | For translation `client_secret` |
 | `OPENAI_TRANSLATION_MODEL` | No | Defaults to `gpt-realtime-translate` |
 | `TRAINING_JOIN_CODE` | No | If set, everyone must enter this **team code** in the join form (same value for trainer and trainees) |
+| `VITE_TURN_URLS` | No | Comma-separated `turn:` / `turns:` URLs for **OpenAI translation WebRTC** when STUN is not enough (corporate firewalls). Example: `turns:turn.example.com:443?transport=tcp` |
+| `VITE_TURN_USERNAME` | No | TURN username (with `VITE_TURN_CREDENTIAL`) |
+| `VITE_TURN_CREDENTIAL` | No | TURN password |
+| `VITE_WEBRTC_ICE_SERVERS` | No | JSON array of full ICE server objects (advanced; see [`docs/TRAINING_ROOM_OPS.md`](TRAINING_ROOM_OPS.md)) |
+
+`VITE_*` values are baked in at **build** time — change them in Vercel and trigger a new deployment.
 
 Redeploy after changing env vars.
 
