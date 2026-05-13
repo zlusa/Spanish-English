@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
 
-import { handleLiveKitToken } from "../../server/handlers"
+import { handleLiveKitToken } from "../lib/handlers"
 
 export default async function handler(
   req: VercelRequest,

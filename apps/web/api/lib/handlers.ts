@@ -4,7 +4,6 @@ import {
   type AccessTokenOptions,
   type VideoGrant,
   RoomServiceClient,
-  TwirpError,
 } from "livekit-server-sdk"
 
 import { joinCodeMatches, joinCodeRequired } from "./join-code"
@@ -13,6 +12,7 @@ import {
   buildTranslationClientSecretRequest,
   normalizeTranslationLanguage,
 } from "./openai-translation"
+import { readJsonBody } from "./read-json-body"
 
 type TokenResponse = {
   serverUrl: string
@@ -48,6 +48,16 @@ function getQuery(
     return v[0]
   }
   return null
+}
+
+function twirpNotFound(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false
+  }
+  return (
+    "code" in error &&
+    String((error as { code: unknown }).code) === "not_found"
+  )
 }
 
 export async function handleLiveKitToken(
@@ -110,33 +120,33 @@ export async function handleLiveKitParticipants(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
-  const liveKitEnv = getLiveKitEnv()
-  if (!liveKitEnv) {
-    res
-      .status(500)
-      .send("Missing LIVEKIT_API_KEY, LIVEKIT_API_SECRET, or LIVEKIT_URL")
-    return
-  }
-
-  const roomName = normalizeLiveKitSegment(getQuery(req.query, "roomName"))
-  if (!roomName) {
-    res.status(400).send("Missing required query parameter: roomName")
-    return
-  }
-
-  const joinCode = getQuery(req.query, "joinCode") ?? ""
-  if (joinCodeRequired() && !joinCodeMatches(joinCode)) {
-    res.status(403).send("Invalid or missing team code (joinCode)")
-    return
-  }
-
-  const roomService = new RoomServiceClient(
-    liveKitEnv.serverUrl,
-    liveKitEnv.apiKey,
-    liveKitEnv.apiSecret
-  )
-
   try {
+    const liveKitEnv = getLiveKitEnv()
+    if (!liveKitEnv) {
+      res
+        .status(500)
+        .send("Missing LIVEKIT_API_KEY, LIVEKIT_API_SECRET, or LIVEKIT_URL")
+      return
+    }
+
+    const roomName = normalizeLiveKitSegment(getQuery(req.query, "roomName"))
+    if (!roomName) {
+      res.status(400).send("Missing required query parameter: roomName")
+      return
+    }
+
+    const joinCode = getQuery(req.query, "joinCode") ?? ""
+    if (joinCodeRequired() && !joinCodeMatches(joinCode)) {
+      res.status(403).send("Invalid or missing team code (joinCode)")
+      return
+    }
+
+    const roomService = new RoomServiceClient(
+      liveKitEnv.serverUrl,
+      liveKitEnv.apiKey,
+      liveKitEnv.apiSecret
+    )
+
     const participants = await roomService.listParticipants(roomName)
     res.status(200).json({
       participants: participants.map((p) => ({
@@ -145,7 +155,7 @@ export async function handleLiveKitParticipants(
       })),
     } satisfies { participants: ParticipantPresence[] })
   } catch (error) {
-    if (error instanceof TwirpError && error.code === "not_found") {
+    if (twirpNotFound(error)) {
       res.status(200).json({ participants: [] })
       return
     }
@@ -159,58 +169,65 @@ export async function handleTranslationToken(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    res.status(500).send("Missing OPENAI_API_KEY")
-    return
-  }
-
-  const payload = (req.body ?? {}) as TranslationTokenRequest
-
-  if (joinCodeRequired() && !joinCodeMatches(payload.joinCode)) {
-    res.status(403).send("Invalid or missing team code (joinCode)")
-    return
-  }
-
-  let language: string
   try {
-    language = normalizeTranslationLanguage(payload.language || "es")
-  } catch (error) {
-    res
-      .status(400)
-      .send(
-        error instanceof Error ? error.message : "Unsupported translation language"
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      res.status(500).send("Missing OPENAI_API_KEY")
+      return
+    }
+
+    const raw = readJsonBody(req)
+    const payload = raw as TranslationTokenRequest
+
+    if (joinCodeRequired() && !joinCodeMatches(payload.joinCode)) {
+      res.status(403).send("Invalid or missing team code (joinCode)")
+      return
+    }
+
+    let language: string
+    try {
+      language = normalizeTranslationLanguage(
+        typeof payload.language === "string" ? payload.language : "es"
       )
-    return
+    } catch (err) {
+      res
+        .status(400)
+        .send(err instanceof Error ? err.message : "Unsupported translation language")
+      return
+    }
+
+    const translationRequest = buildTranslationClientSecretRequest({
+      apiKey,
+      language,
+      inputTranscriptionEnabled: !!payload.inputTranscriptionEnabled,
+      noiseReductionEnabled: !!payload.noiseReductionEnabled,
+      model: process.env.OPENAI_TRANSLATION_MODEL,
+    })
+
+    const response = await fetch(translationRequest.url, translationRequest.init)
+    if (!response.ok) {
+      res.status(response.status).send(await response.text())
+      return
+    }
+
+    const data = (await response.json()) as ClientSecretResponse
+    const clientSecret = data.value ?? data.client_secret?.value
+    if (!clientSecret) {
+      res
+        .status(502)
+        .send("Realtime translation client secret response was missing value")
+      return
+    }
+
+    res.status(200).json({
+      clientSecret,
+      expiresAt: data.expires_at ?? data.client_secret?.expires_at ?? null,
+    })
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "translation-token failed"
+    res.status(500).send(message)
   }
-
-  const translationRequest = buildTranslationClientSecretRequest({
-    apiKey,
-    language,
-    inputTranscriptionEnabled: !!payload.inputTranscriptionEnabled,
-    noiseReductionEnabled: !!payload.noiseReductionEnabled,
-    model: process.env.OPENAI_TRANSLATION_MODEL,
-  })
-
-  const response = await fetch(translationRequest.url, translationRequest.init)
-  if (!response.ok) {
-    res.status(response.status).send(await response.text())
-    return
-  }
-
-  const data = (await response.json()) as ClientSecretResponse
-  const clientSecret = data.value ?? data.client_secret?.value
-  if (!clientSecret) {
-    res
-      .status(502)
-      .send("Realtime translation client secret response was missing value")
-    return
-  }
-
-  res.status(200).json({
-    clientSecret,
-    expiresAt: data.expires_at ?? data.client_secret?.expires_at ?? null,
-  })
 }
 
 async function createParticipantToken(

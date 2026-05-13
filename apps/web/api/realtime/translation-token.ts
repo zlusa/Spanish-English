@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
 
-import { handleTranslationToken } from "../../server/handlers"
+import { handleTranslationToken } from "../lib/handlers"
 
 export default async function handler(
   req: VercelRequest,
