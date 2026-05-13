@@ -37,10 +37,9 @@ The translation sidecar opens a **second** browser `RTCPeerConnection` to **Open
 - **Phone / tablet:** use the **Hold to speak** button (there is no Space key in the mobile browser for this).
 - Release to mute. Helps in noisy rooms.
 
-## Optional source transcription & noise reduction
+## Near-field noise reduction
 
-- **Source-language transcription** sends input audio through the translation stack’s transcription path (see OpenAI Realtime Translation docs). Disable if you need minimal processing.
-- **Near-field noise reduction** helps laptop mics; disable if audio sounds “thin” or clipped.
+- **Near-field noise reduction** helps laptop mics on the translation input path; disable if audio sounds “thin” or clipped.
 
 ## Secrets
 

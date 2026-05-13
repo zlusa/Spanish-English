@@ -58,7 +58,6 @@ type RemoteTileProps = {
   outputLanguage: string
   translationActive: boolean
   translatedVolume: number
-  sourceTranscription: boolean
   noiseReduction: boolean
   overConcurrencyCap: boolean
   joinCode: string
@@ -69,7 +68,6 @@ function RemoteSpeakerTile({
   outputLanguage,
   translationActive,
   translatedVolume,
-  sourceTranscription,
   noiseReduction,
   overConcurrencyCap,
   joinCode,
@@ -82,7 +80,6 @@ function RemoteSpeakerTile({
     enabled: translationActive && Boolean(sourceTrack),
     sourceTrack,
     language: outputLanguage,
-    sourceTranscriptionEnabled: sourceTranscription,
     noiseReductionEnabled: noiseReduction,
     translatedVolume,
     joinCode,
@@ -103,29 +100,11 @@ function RemoteSpeakerTile({
       <p className="muted">
         Mic track: {sourceTrack ? "received (subscribed)" : "waiting…"}
         {" · "}
-        Sidecar: {translation.status}
+        Translation: {translation.status}
         {translation.error ? (
           <span className="error"> — {translation.error}</span>
         ) : null}
       </p>
-      <div className="stack" style={{ marginTop: "0.5rem" }}>
-        <div>
-          <div className="muted" style={{ fontSize: "0.8rem" }}>
-            Source (original room audio + transcript)
-          </div>
-          <div className="caption-box">
-            {translation.sourceSubtitle || "…"}
-          </div>
-        </div>
-        <div>
-          <div className="muted" style={{ fontSize: "0.8rem" }}>
-            Translated ({outputLanguage.toUpperCase()})
-          </div>
-          <div className="caption-box">
-            {translation.translatedSubtitle || "…"}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -144,7 +123,6 @@ export function TrainingRoom() {
   const [, bump] = React.useState(0)
   const [translationEnabled, setTranslationEnabled] = React.useState(true)
   const [translatedVolume, setTranslatedVolume] = React.useState(0.92)
-  const [sourceTranscription, setSourceTranscription] = React.useState(true)
   const [noiseReduction, setNoiseReduction] = React.useState(true)
   const [activeRoomLabel, setActiveRoomLabel] = React.useState("")
   const [joinCode, setJoinCode] = React.useState("")
@@ -498,14 +476,6 @@ export function TrainingRoom() {
             <label className="row">
               <input
                 type="checkbox"
-                checked={sourceTranscription}
-                onChange={(ev) => setSourceTranscription(ev.target.checked)}
-              />
-              Source-language transcription (OpenAI whisper on translation input)
-            </label>
-            <label className="row">
-              <input
-                type="checkbox"
                 checked={noiseReduction}
                 onChange={(ev) => setNoiseReduction(ev.target.checked)}
               />
@@ -539,7 +509,6 @@ export function TrainingRoom() {
                     translationEnabled && index < MAX_CONCURRENT_TRANSLATIONS
                   }
                   translatedVolume={translatedVolume}
-                  sourceTranscription={sourceTranscription}
                   noiseReduction={noiseReduction}
                   overConcurrencyCap={index >= MAX_CONCURRENT_TRANSLATIONS}
                   joinCode={joinCode}
@@ -549,7 +518,7 @@ export function TrainingRoom() {
           )}
 
           <p className="muted">
-            Room audio still plays through LiveKit as usual; translated audio is
+            Room audio still plays through LiveKit as usual; translated speech is
             played locally from the OpenAI sidecar. Adjust the trainer/trainee
             role before joining so the correct output language is used.
           </p>

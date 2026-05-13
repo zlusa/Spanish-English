@@ -18,7 +18,6 @@ type UseRemoteTranslationOptions = {
   enabled: boolean
   sourceTrack: MediaStreamTrack | null
   language: string
-  sourceTranscriptionEnabled: boolean
   noiseReductionEnabled: boolean
   translatedVolume: number
   /** Sent to server if set; required when `TRAINING_JOIN_CODE` is configured. */
@@ -28,16 +27,11 @@ type UseRemoteTranslationOptions = {
 export type UseRemoteTranslationResult = {
   status: TranslationStatus
   error: string | null
-  sourceTranscript: string
-  translatedTranscript: string
-  sourceSubtitle: string
-  translatedSubtitle: string
   hasOutputAudio: boolean
 }
 
 type TranslationSessionConfig = {
   language: string
-  sourceTranscriptionEnabled: boolean
   noiseReductionEnabled: boolean
 }
 
@@ -60,15 +54,12 @@ export function useRemoteTranslation({
   enabled,
   sourceTrack,
   language,
-  sourceTranscriptionEnabled,
   noiseReductionEnabled,
   translatedVolume,
   joinCode,
 }: UseRemoteTranslationOptions): UseRemoteTranslationResult {
   const [status, setStatus] = React.useState<TranslationStatus>("idle")
   const [error, setError] = React.useState<string | null>(null)
-  const [sourceTranscript, setSourceTranscript] = React.useState("")
-  const [translatedTranscript, setTranslatedTranscript] = React.useState("")
   const [hasOutputAudio, setHasOutputAudio] = React.useState(false)
   const peerConnectionRef = React.useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = React.useRef<RTCDataChannel | null>(null)
@@ -76,7 +67,6 @@ export function useRemoteTranslation({
   const translatedVolumeRef = React.useRef(translatedVolume)
   const sessionConfigRef = React.useRef<TranslationSessionConfig>({
     language,
-    sourceTranscriptionEnabled,
     noiseReductionEnabled,
   })
   const active = enabled && !!sourceTrack
@@ -91,7 +81,6 @@ export function useRemoteTranslation({
   React.useEffect(() => {
     const nextConfig: TranslationSessionConfig = {
       language,
-      sourceTranscriptionEnabled,
       noiseReductionEnabled,
     }
     sessionConfigRef.current = nextConfig
@@ -104,7 +93,7 @@ export function useRemoteTranslation({
     dataChannel.send(
       JSON.stringify(buildTranslationSessionUpdate(nextConfig))
     )
-  }, [active, language, noiseReductionEnabled, sourceTranscriptionEnabled])
+  }, [active, language, noiseReductionEnabled])
 
   React.useEffect(() => {
     if (!active || !sourceTrack) {
@@ -123,8 +112,6 @@ export function useRemoteTranslation({
       const initialSessionConfig = sessionConfigRef.current
       setStatus("connecting")
       setError(null)
-      setSourceTranscript("")
-      setTranslatedTranscript("")
       setHasOutputAudio(false)
 
       try {
@@ -133,8 +120,7 @@ export function useRemoteTranslation({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             language: initialSessionConfig.language,
-            inputTranscriptionEnabled:
-              initialSessionConfig.sourceTranscriptionEnabled,
+            inputTranscriptionEnabled: false,
             noiseReductionEnabled: initialSessionConfig.noiseReductionEnabled,
             joinCode: joinCode.trim() || undefined,
           }),
@@ -200,17 +186,7 @@ export function useRemoteTranslation({
           if (!cancelled) {
             void handleRealtimeEvent(event.data, {
               onSessionReady: () => setStatus("connected"),
-              onInputTranscript: (delta) => {
-                setSourceTranscript((current) =>
-                  appendTranscriptDelta(current, delta)
-                )
-              },
               onOutputAudio: () => setHasOutputAudio(true),
-              onOutputTranscript: (delta) => {
-                setTranslatedTranscript((current) =>
-                  appendTranscriptDelta(current, delta)
-                )
-              },
               onError: (message) => {
                 setError(message)
                 setStatus("error")
@@ -296,10 +272,6 @@ export function useRemoteTranslation({
   return {
     status: active ? status : "idle",
     error: active ? error : null,
-    sourceTranscript,
-    translatedTranscript,
-    sourceSubtitle: getSubtitle(sourceTranscript),
-    translatedSubtitle: getSubtitle(translatedTranscript),
     hasOutputAudio: active ? hasOutputAudio : false,
   }
 }
@@ -308,9 +280,7 @@ async function handleRealtimeEvent(
   payload: unknown,
   handlers: {
     onSessionReady: () => void
-    onInputTranscript: (delta: string) => void
     onOutputAudio: () => void
-    onOutputTranscript: (delta: string) => void
     onError: (message: string) => void
   }
 ) {
@@ -337,22 +307,8 @@ async function handleRealtimeEvent(
     return
   }
 
-  if (event.type === "session.input_transcript.delta") {
-    if (typeof event.delta === "string") {
-      handlers.onInputTranscript(event.delta)
-    }
-    return
-  }
-
   if (event.type === "session.output_audio.delta") {
     handlers.onOutputAudio()
-    return
-  }
-
-  if (event.type === "session.output_transcript.delta") {
-    if (typeof event.delta === "string") {
-      handlers.onOutputTranscript(event.delta)
-    }
     return
   }
 
@@ -369,44 +325,12 @@ async function handleRealtimeEvent(
   }
 }
 
-function appendTranscriptDelta(current: string, delta: string) {
-  if (!delta) {
-    return current
-  }
-  if (!current) {
-    return delta.replace(/^\s+/, "")
-  }
-  if (
-    /\s$/.test(current) ||
-    /^\s/.test(delta) ||
-    /^[,.;:!?%)}\]]/.test(delta)
-  ) {
-    return `${current}${delta}`
-  }
-  return `${current} ${delta}`
-}
-
 function buildTranslationSessionUpdate(config: TranslationSessionConfig) {
   return buildSessionUpdate({
     language: config.language,
-    inputTranscriptionEnabled: config.sourceTranscriptionEnabled,
+    inputTranscriptionEnabled: false,
     noiseReductionEnabled: config.noiseReductionEnabled,
   })
-}
-
-function getSubtitle(transcript: string) {
-  const normalized = transcript.replace(/\s+/g, " ").trim()
-  if (!normalized) {
-    return ""
-  }
-  const sentenceStart = Math.max(
-    normalized.lastIndexOf(". "),
-    normalized.lastIndexOf("? "),
-    normalized.lastIndexOf("! ")
-  )
-  const latest =
-    sentenceStart >= 0 ? normalized.slice(sentenceStart + 2) : normalized
-  return latest.length > 180 ? latest.slice(latest.length - 180) : latest
 }
 
 function getErrorMessage(error: unknown) {

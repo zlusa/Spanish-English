@@ -108,16 +108,6 @@ select.select {
   font-size: 1rem;
 }
 
-.caption-box {
-  min-height: 4rem;
-  padding: 0.5rem 0.65rem;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  font-size: 0.9rem;
-  white-space: pre-wrap;
-}
-
 .error {
   color: #b91c1c;
   font-size: 0.9rem;
